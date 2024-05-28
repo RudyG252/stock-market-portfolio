@@ -23,3 +23,7 @@
 }
 
 svg {font-size: 1.2rem; cursor: pointer;}
+
+.btn {margin: 15px 10px;}
+
+label {text-align: left; font-weight: bold; margin-top: 10px !important;}

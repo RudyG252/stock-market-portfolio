@@ -3,7 +3,8 @@ import './App.css';
 import { Card, CardHeader, CardBody, CardFooter, Button } from 'reactstrap';
 import sampleData from './sampleData';
 import StockList from './StockList';
-import utilities from './Utilities'
+import utilities from './Utilities';
+import AddStockForm from './AddStockForm';
 
 function App() {
   
@@ -16,6 +17,7 @@ function App() {
   const [stockPrices, setStockPrices] = useState({});
   const [tickerList, setTickerList] = useState([]);
   const [portfolioData, setPortfolioData] = useState([]);
+  const [showAddStockForm, setShowAddStockForm] = useState(false);
   const AWS_API_GATEWAY = "https://3v0khj0oej.execute-api.us-east-1.amazonaws.com/prod";
   const AWS_API_GATEWAY_GET_PORTFOLIO = AWS_API_GATEWAY + "/get-portfolio";
   const AWS_API_GATEWAY_GET_STOCK_PRICE = AWS_API_GATEWAY + "/get-stock-price";
@@ -33,7 +35,6 @@ function App() {
   
   useEffect(() => {
     let stockInfoArr = [];
-    console.log(stockPrices);
     for (let i = 0; i < stocks.length; i++) {
       let info = {
         ticker: stocks[i].ticker,
@@ -41,7 +42,7 @@ function App() {
         purchasePrice: stocks[i].purchasePrice,
       }
       if (stockPrices[stocks[i].ticker] != undefined) {
-        console.log("good");
+  
         let stockPriceObj = stockPrices[stocks[i].ticker];
         info = {
           ...info,
@@ -54,6 +55,7 @@ function App() {
           formattedCurrentValue: utilities.formatNumber(stockPriceObj["price"] * info.shares),
           formattedProfit: utilities.formatNumber(info.shares * (stockPriceObj["price"] - info.purchasePrice))
         };
+        // console.log(info);
       }
       stockInfoArr.push(info);
     }
@@ -123,6 +125,7 @@ function App() {
     Promise.all(promises)
       .then(stocks => {
         const stockPrices = stocks.reduce((obj, stock) => {
+          console.log(stock);
           const info = {
             name: stock.data["Global Quote"] ? stock.data["Global Quote"]["01. symbol"] : null,
             price: stock.data["Global Quote"] ? stock.data['Global Quote']['05. price'] : null
@@ -135,25 +138,38 @@ function App() {
   }, [tickerList])
 
   
-  const addStock = evt => {
-    console.log('add stock clicked');
+  
+  function addStock() {
+    setShowAddStockForm(true);
+    return;
+  }
+  
+  function closeAddStockForm() {
+    console.log("test");
+    setShowAddStockForm(false);
+  }
+  
+  if (showAddStockForm) {
+    return <AddStockForm closeAddStockForm = {closeAddStockForm} getPortfolio = {getPortfolio}></AddStockForm>
+  }
+  else {
+    return (
+      <div className="App">
+        <Card>
+          <CardHeader className="card-header-color">
+            <h4>{myName}'s Stock Portfolio</h4>
+          </CardHeader>
+          <CardBody>
+            <StockList data={portfolioData} getPortfolio = {getPortfolio}/>
+          </CardBody>
+          <CardFooter>
+            <Button size="sm" onClick={function() {setShowAddStockForm(true)}}>Add stock</Button>
+          </CardFooter>
+        </Card>
+      </div>
+  );
   }
 
-  return (
-    <div className="App">
-      <Card>
-        <CardHeader className="card-header-color">
-          <h4>{myName}'s Stock Portfolio</h4>
-        </CardHeader>
-        <CardBody>
-          <StockList data={portfolioData} getPortfolio = {getPortfolio}/>
-        </CardBody>
-        <CardFooter>
-          <Button size="sm" onClick={addStock}>Add stock</Button>
-        </CardFooter>
-      </Card>
-    </div>
-  );
 }
 
 export default App;
