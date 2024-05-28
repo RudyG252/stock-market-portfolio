@@ -3,6 +3,7 @@ import './App.css';
 import { Card, CardHeader, CardBody, CardFooter, Button } from 'reactstrap';
 import sampleData from './sampleData';
 import StockList from './StockList';
+import utilities from './Utilities'
 
 function App() {
   
@@ -12,13 +13,54 @@ function App() {
   
   const [stocks, setStocks] = useState([]);
   const [stockList, setStockList] = useState([]);
+  const [stockPrices, setStockPrices] = useState({});
+  const [tickerList, setTickerList] = useState([]);
+  const [portfolioData, setPortfolioData] = useState([]);
   const AWS_API_GATEWAY = "https://3v0khj0oej.execute-api.us-east-1.amazonaws.com/prod";
   const AWS_API_GATEWAY_GET_PORTFOLIO = AWS_API_GATEWAY + "/get-portfolio";
+  const AWS_API_GATEWAY_GET_STOCK_PRICE = AWS_API_GATEWAY + "/get-stock-price";
   
   // Retrieve the current stock information when the page first loads
   useEffect(() => {
     // setStocks(sampleData);
-    const options = {
+    getPortfolio();
+
+  }, []);
+  
+  useEffect(() => {
+    setTickerList(createTickerList(stocks));
+  }, [stocks])
+  
+  useEffect(() => {
+    let stockInfoArr = [];
+    console.log(stockPrices);
+    for (let i = 0; i < stocks.length; i++) {
+      let info = {
+        ticker: stocks[i].ticker,
+        shares: stocks[i].shares,
+        purchasePrice: stocks[i].purchasePrice,
+      }
+      if (stockPrices[stocks[i].ticker] != undefined) {
+        console.log("good");
+        let stockPriceObj = stockPrices[stocks[i].ticker];
+        info = {
+          ...info,
+          name: stockPriceObj["name"],
+          currentPrice: stockPriceObj["price"],
+          purchaseValue: (info.purchasePrice * info.shares),
+          currentValue: (stockPriceObj["price"] * info.shares),
+          profit: (info.shares * (stockPriceObj["price"] - info.purchasePrice)),
+          formattedPurchaseValue: utilities.formatNumber(info.purchasePrice * info.shares),
+          formattedCurrentValue: utilities.formatNumber(stockPriceObj["price"] * info.shares),
+          formattedProfit: utilities.formatNumber(info.shares * (stockPriceObj["price"] - info.purchasePrice))
+        };
+      }
+      stockInfoArr.push(info);
+    }
+    setPortfolioData(stockInfoArr);
+  }, [stocks, stockPrices])
+  function getPortfolio() {
+        const options = {
       method: 'POST',
       cache: 'default'
     };
@@ -32,7 +74,6 @@ function App() {
       })
       .then(function(response) {
         response.Items.map(item => {
-          item.name = item.name.S;
           item.ticker = item.ticker.S;
           item.purchasePrice = item.purchasePrice.N;
           item.shares = item.shares.N;
@@ -43,21 +84,56 @@ function App() {
       .catch(function(error) {
         console.log(error);
       })
-
-  }, []);
+  }
   
+  
+  function createTickerList(portfolioList) {
+    let tickerList = [];
+    for (let i = 0; i < portfolioList.length; i++) {
+      tickerList[i] = portfolioList[i].ticker;
+    }
+    return tickerList;
+  }
+  
+  function getStockPrice(ticker) {
+    return new Promise((resolve, reject) => {
+      const fetchOptions = {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ticker: ticker})
+      }
+      
+      fetch(AWS_API_GATEWAY_GET_STOCK_PRICE, fetchOptions)
+        .then(response => {
+          if(!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          return response.json();
+        })
+        .then(data => resolve(data))
+        .catch(error => reject(error));
+    });
+  }
   // With the stock data add purchase value, current price
   // and current value to the stock record
   useEffect(() => {
-    const enhancedStocks = stocks.map(stock => {
-      stock.purchaseValue = stock.shares * stock.purchasePrice;
-      stock.currentPrice = Math.random()*200 + 50;
-      stock.currentValue = stock.shares * stock.currentPrice;
-      stock.profit = stock.currentValue - stock.purchaseValue;
-      return stock;
-    })
-    setStockList(enhancedStocks);
-  }, [stocks])
+    let promises = tickerList.map(ticker => getStockPrice(ticker));
+    Promise.all(promises)
+      .then(stocks => {
+        const stockPrices = stocks.reduce((obj, stock) => {
+          const info = {
+            name: stock.data["Global Quote"] ? stock.data["Global Quote"]["01. symbol"] : null,
+            price: stock.data["Global Quote"] ? stock.data['Global Quote']['05. price'] : null
+          }
+          obj[stock.ticker] = info;
+          return obj;
+        }, {});
+        setStockPrices(stockPrices);
+      })
+  }, [tickerList])
+
   
   const addStock = evt => {
     console.log('add stock clicked');
@@ -70,7 +146,7 @@ function App() {
           <h4>{myName}'s Stock Portfolio</h4>
         </CardHeader>
         <CardBody>
-          <StockList data={stockList} />
+          <StockList data={portfolioData} getPortfolio = {getPortfolio}/>
         </CardBody>
         <CardFooter>
           <Button size="sm" onClick={addStock}>Add stock</Button>

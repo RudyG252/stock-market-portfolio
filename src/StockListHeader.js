@@ -2,6 +2,7 @@ function StockListHeader() {
   
   return (
     <tr>
+      <th>Del</th>
       <th>Ticker</th>
       <th>Name</th>
       <th>Shares</th>
